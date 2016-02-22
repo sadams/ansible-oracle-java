@@ -13,33 +13,22 @@
 
 - include: set-role-variables.yml
 
+- name: copy scripts to server
+  copy: src="../files/check-tarball-installed.sh"  dest="{{ java_download_path }}/"  mode="a+x"
 
-
-- name: fetch .rpm or .tar.gz files from Oracle site
-  include: fetch.yml
-  when: java_download_from_oracle
-
-- name: copy RPM from local
-  copy:
-    src: "{{ playbook_dir }}/files/{{ jdk_tarball_file }}.rpm"
-    dest: "{{ java_download_path }}/{{ jdk_tarball_file }}.rpm"
-  when: not java_download_from_oracle and ansible_pkg_mgr == "yum"
-
-- name: copy tarball from local
-  copy:
-    src: "{{ playbook_dir }}/files/{{ jdk_tarball_file }}.tar.gz"
-    dest: "{{ java_download_path }}/{{ jdk_tarball_file }}.tar.gz"
-  when: not java_download_from_oracle and ansible_pkg_mgr != "yum"
-
-
+- name: check if specific version of Oracle JDK is installed?
+  shell: LC_ALL="en_US.UTF-8"  {{ java_download_path }}/check-tarball-installed.sh  "{{ jdk_version }}"
+  register: jdk_info
+  changed_when: false
+  failed_when: jdk_info.rc > 0
 
 - name: delegate to RPM installation process
-  include: use-rpm.yml
-  when: ansible_pkg_mgr == "yum"
+  include: install-jdk-rpm.yml
+  when: (jdk_info.stdout|from_json).not_found and ansible_pkg_mgr == "yum"
 
 - name: delegate to raw tarball installation
-  include: use-tarball.yml
-  when: ansible_pkg_mgr != "yum"
+  include: install-jdk-tarball.yml
+  when: (jdk_info.stdout|from_json).not_found and ansible_pkg_mgr != "yum"
 
 
 
